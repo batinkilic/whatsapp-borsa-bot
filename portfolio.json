@@ -1,0 +1,13 @@
+{
+  "ARB":   { "amount": 125.2119,   "buy_price": 10.76,      "url": "crypto/arbitrum" },
+  "RUNE":  { "amount": 21.978,     "buy_price": 50.9042,    "url": "crypto/thorchain" },
+  "SOL":   { "amount": 0.1667495,  "buy_price": 5355.20,    "url": "crypto/solana" },
+  "LINK":  { "amount": 1.41787,    "buy_price": 472.40,     "url": "crypto/chainlink" },
+  "USD":   { "amount": 26.05,      "buy_price": 40.23,      "url": "currencies/usd-try" },
+  "EUR":   { "amount": 10.76,      "buy_price": 46.388247,  "url": "currencies/eur-try" },
+  "XAU":   { "amount": 0.34,       "buy_price": 4329.52,    "url": "currencies/gau-try" },
+  "SASA":  { "amount": 269,        "buy_price": 2.78,       "url": "equities/sasa-polyester" },
+  "KRDMD": { "amount": 31,         "buy_price": 22.32,      "url": "equities/kardemir-(d)" },
+  "ASELS": { "amount": 10,         "buy_price": 147.00,     "url": "equities/aselsan" },
+  "ZOREN": { "amount": 398,        "buy_price": 2.82,       "url": "equities/zorlu-enerji" }
+}
