@@ -8,6 +8,7 @@ from twilio.rest import Client
 from bs4 import BeautifulSoup
 import re
 import threading
+import yfinance as yf
 
 load_dotenv()
 
@@ -253,6 +254,47 @@ def format_portfolio_report(portfolio_rows, total_profit):
     return f"📊 Günlük Varlık Raporun\n\n{header}\n{body}\n\n💰 Toplam Kâr/Zarar: {total_profit:+.2f} TL"
 
 
+def get_isyatirim_price(symbol):
+    url = f"https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hl={symbol}"
+    print(f"[DEBUG] İş Yatırım fiyatı çekiliyor: {url}")
+    try:
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+        # 'Son Fiyat' başlığını bul
+        th = soup.find("th", string=lambda s: s and "Son Fiyat" in s)
+        if th:
+            td = th.find_next("td", class_="text-right")
+            if td:
+                price_str = td.text.strip().replace('.', '').replace(',', '.')
+                print(f"[DEBUG] {symbol} fiyat bulundu: {price_str} ({url})")
+                return float(price_str)
+        # Alternatif: Tüm <td class="text-right">'leri tara, ilk sayısal olanı al
+        for td in soup.find_all("td", class_="text-right"):
+            text = td.text.strip().replace('.', '').replace(',', '.')
+            try:
+                val = float(text)
+                print(f"[DEBUG] {symbol} alternatif fiyat bulundu: {text} ({url})")
+                return val
+            except:
+                continue
+        print(f"[ERROR] {symbol} için fiyat etiketi bulunamadı! URL: {url}")
+        return 0
+    except Exception as e:
+        print(f"[ERROR] {symbol} verisi çekilemedi: {e} (URL: {url})")
+        return 0
+
+
+def get_yahoo_price(symbol):
+    try:
+        ticker = yf.Ticker(symbol + ".IS")
+        price = ticker.history(period='1d')["Close"].iloc[-1]
+        print(f"[DEBUG] {symbol} Yahoo Finance fiyatı: {price}")
+        return float(price)
+    except Exception as e:
+        print(f"[ERROR] {symbol} Yahoo Finance verisi çekilemedi: {e}")
+        return 0
+
+
 # Varlık değerlerini hesapla
 def calculate_portfolio_value():
     print("[DEBUG] Portföy hesaplanıyor...")
@@ -280,19 +322,18 @@ def calculate_portfolio_value():
             price = get_enpara_price("XAU")
             print(f"[DEBUG] XAU Enpara fiyatı: {price}")
         elif asset == "RUNE":
-            # Sadece USDT paritesiyle TL'ye çevir
             url = f'https://api.binance.com/api/v3/ticker/price?symbol=RUNEUSDT'
             response = requests.get(url, timeout=10)
             data = response.json()
             if 'price' in data and usdttry:
                 rune_usdt = float(data['price'])
                 price = rune_usdt * usdttry
-                print(
-                    f'[DEBUG] RUNE USDT fiyatı: {rune_usdt}, USDT/TRY: {usdttry}, TL fiyatı: {price}'
-                )
+                print(f'[DEBUG] RUNE USDT fiyatı: {rune_usdt}, USDT/TRY: {usdttry}, TL fiyatı: {price}')
             else:
                 price = 0
                 print(f'[ERROR] RUNE fiyatı alınamadı!')
+        elif asset in ["ZOREN", "ASELS", "SASA", "KRDMD"]:
+            price = get_yahoo_price(asset)
         elif asset in BINANCE_SYMBOLS:
             price = get_binance_price(asset)
             print(f"[DEBUG] {asset} Binance TL fiyatı: {price}")
@@ -307,9 +348,7 @@ def calculate_portfolio_value():
         cost = round(amount * buy_price_tl_per_unit, 2)
         profit = round(current_value - cost, 2)
         total_profit += profit
-        report.append(
-            f"{asset:<9}{amount:<10.2f}{buy_price_tl_per_unit:<13.2f}{price:<15.2f}{profit:+.2f}"
-        )
+        report.append(f"{asset:<9}{amount:<10.2f}{buy_price_tl_per_unit:<13.2f}{price:<15.2f}{profit:+.2f}")
 
     report.append(f"\n💰 Toplam Kâr/Zarar: {total_profit:+.2f} TL")
     return "\n".join(report)
@@ -357,9 +396,7 @@ def send_whatsapp_alert(message):
 def monitor_alerts(portfolio):
     last_alerts = {}
     while True:
-        print(
-            f"[DEBUG] Yeni fiyat kontrolü başlatılıyor... ({time.strftime('%Y-%m-%d %H:%M:%S')})"
-        )
+        print(f"[DEBUG] Yeni fiyat kontrolü başlatılıyor... ({time.strftime('%Y-%m-%d %H:%M:%S')})")
         prices = {}
         for asset, info in portfolio.items():
             if asset == "USD":
@@ -378,14 +415,15 @@ def monitor_alerts(portfolio):
                     price = rune_usdt * usdttry
                 else:
                     price = 0
+            elif asset in ["ZOREN", "ASELS", "SASA", "KRDMD"]:
+                price = get_yahoo_price(asset)
             elif asset in BINANCE_SYMBOLS:
                 price = get_binance_price(asset)
             else:
                 price = get_stock_price_investing(info["url"])
             prices[asset] = price
             print(f"[DEBUG] {asset} güncel fiyatı: {price}")
-        alerts = check_alerts(prices, ALERT_LEVELS, last_alerts,
-                              ALERT_TOLERANCES)
+        alerts = check_alerts(prices, ALERT_LEVELS, last_alerts, ALERT_TOLERANCES)
         for asset, alert in alerts:
             send_whatsapp_alert(alert)
             print(f"[ALERT] {alert}")
