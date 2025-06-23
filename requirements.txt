@@ -2,3 +2,4 @@ python-dotenv
 requests
 schedule
 twilio
+beautifulsoup4
